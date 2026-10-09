@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../core/network/api_exception.dart';
+import '../../services/auth_service.dart';
+
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -13,6 +16,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
+  final _authService = AuthService();
+  bool _loading = false;
   bool _obscurePassword = true;
   String _role = 'patient';
 
@@ -25,12 +30,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void _submit() {
-    if (_formKey.currentState!.validate()) {
-      // TODO: appeler AuthService.register (Étape 6)
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Inscription valide')),
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _loading = true);
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    try {
+      await _authService.register(
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        role: _role,
       );
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Compte créé, connectez-vous')),
+      );
+      navigator.pop();
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -138,17 +159,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         border: OutlineInputBorder(),
                       ),
                       items: const [
-                        DropdownMenuItem(value: 'patient', child: Text('Patient')),
-                        DropdownMenuItem(value: 'doctor', child: Text('Médecin')),
+                        DropdownMenuItem(
+                            value: 'patient', child: Text('Patient')),
+                        DropdownMenuItem(
+                            value: 'doctor', child: Text('Médecin')),
                       ],
                       onChanged: (value) => setState(() => _role = value!),
                     ),
                     const SizedBox(height: 24),
                     FilledButton(
-                      onPressed: _submit,
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 14),
-                        child: Text("S'inscrire"),
+                      onPressed: _loading ? null : _submit,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        child: _loading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text("S'inscrire"),
                       ),
                     ),
                     const SizedBox(height: 12),

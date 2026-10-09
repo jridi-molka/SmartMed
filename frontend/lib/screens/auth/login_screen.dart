@@ -1,5 +1,8 @@
-import '../../routes/app_routes.dart';
 import 'package:flutter/material.dart';
+
+import '../../core/network/api_exception.dart';
+import '../../routes/app_routes.dart';
+import '../../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -12,6 +15,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _authService = AuthService();
+  bool _loading = false;
   bool _obscurePassword = true;
 
   @override
@@ -21,12 +26,27 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _submit() {
-    if (_formKey.currentState!.validate()) {
-      // TODO: appeler AuthService.login (Étape 6)
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Formulaire valide')),
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _loading = true);
+    try {
+      final auth = await _authService.login(
+        _emailController.text.trim(),
+        _passwordController.text,
       );
+      if (!mounted) return;
+      // TODO Étape 7: stocker le token | Étape 8: aller vers Home
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Connecté ! token: ${auth.accessToken}')),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -98,17 +118,24 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 24),
                     FilledButton(
-                      onPressed: _submit,
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 14),
-                        child: Text('Se connecter'),
+                      onPressed: _loading ? null : _submit,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        child: _loading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text('Se connecter'),
                       ),
                     ),
                     const SizedBox(height: 12),
                     TextButton(
-  onPressed: () => Navigator.pushNamed(context, AppRoutes.register),
-  child: const Text('Créer un compte'),
-),
+                      onPressed: () =>
+                          Navigator.pushNamed(context, AppRoutes.register),
+                      child: const Text('Créer un compte'),
+                    ),
                   ],
                 ),
               ),
