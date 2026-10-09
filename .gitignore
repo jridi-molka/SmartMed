@@ -15,3 +15,12 @@ frontend/.flutter-plugins-dependencies
 # IDE
 .vscode/
 .idea/
+
+# Python
+venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Secrets
+.env
