@@ -1,3 +1,4 @@
+import '../../routes/app_routes.dart';
 import 'package:flutter/material.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -105,11 +106,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 12),
                     TextButton(
-                      onPressed: () {
-                        // TODO: Navigator.pushNamed(context, '/register') (Étape 5)
-                      },
-                      child: const Text('Créer un compte'),
-                    ),
+  onPressed: () => Navigator.pushNamed(context, AppRoutes.register),
+  child: const Text('Créer un compte'),
+),
                   ],
                 ),
               ),
