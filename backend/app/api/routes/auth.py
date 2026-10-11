@@ -6,6 +6,9 @@ from app.db.session import get_db
 from app.schemas.user import Token, UserCreate, UserLogin, UserOut
 from app.services import auth_service
 
+from app.api.deps import get_current_user
+from app.models.user import User
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
@@ -28,3 +31,8 @@ def login(data: UserLogin, db: Session = Depends(get_db)):
             detail="Invalid credentials",
         )
     return Token(access_token=create_access_token(user.id))
+
+
+@router.post("/logout")
+def logout(current_user: User = Depends(get_current_user)):
+    return {"message": "Logged out successfully"}
