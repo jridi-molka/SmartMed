@@ -9,9 +9,20 @@ Génère les 3 jeux de données simulés du module IA de SmartMed :
 Utilisation (depuis le dossier AI/) :
     python data/generate_data.py
 
-Les fichiers CSV sont créés dans le même dossier que ce script (AI/data/).
+Le script crée DEUX versions des mêmes données :
+
+  - AI/data/reference/ : la version PARFAITE (vérité terrain). Elle ne sert
+    qu'à vérifier, à la fin, que le nettoyage a bien remis les choses en état.
+  - AI/data/raw/ : la version BRUTE, point de départ du pipeline, avec des
+    anomalies injectées VOLONTAIREMENT (doublons, valeurs manquantes,
+notes impossibles...) pour simuler les imperfections de vraies données
+d'utilisateurs. Le nombre exact d'anomalies est noté dans
+AI/data/raw/anomalies_injected.json, afin de pouvoir vérifier que le script de
+nettoyage les retrouve toutes.
 """
 
+import json
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -222,10 +233,98 @@ def generate_waiting_history(doctors):
 
 
 # ---------------------------------------------------------------------------
-# 6. PROGRAMME PRINCIPAL
+# 6. ANOMALIES VOLONTAIRES (simulation de vraies données "sales")
+# ---------------------------------------------------------------------------
+
+# Générateur de hasard SÉPARÉ du premier : il ne modifie donc pas les données
+# propres générées plus haut (elles restent identiques à chaque exécution).
+rng_noise = np.random.default_rng(SEED + 1)
+
+
+def pick(pool, n):
+    """Choisit n lignes DIFFÉRENTES dans 'pool' et les retire du pool.
+    Ainsi, une même ligne n'a jamais deux anomalies à la fois."""
+    chosen = [int(i) for i in rng_noise.choice(pool, size=n, replace=False)]
+    for i in chosen:
+        pool.remove(i)
+    return chosen
+
+
+def messy(text):
+    """Abîme un texte : espaces autour et double espace à l'intérieur."""
+    return "  " + text.replace(" ", "  ", 1) + "   "
+
+
+def inject_anomalies(doctors, reviews, waiting):
+    """Renvoie 3 tableaux 'bruts' (avec anomalies) et le détail des anomalies."""
+    log = {}
+
+    # ---------------- médecins ----------------
+    d = doctors.copy().reset_index(drop=True)
+    pool = list(range(len(d)))
+    for i in pick(pool, 4):
+        d.loc[i, "name"] = "  " + d.loc[i, "name"] + " "
+    dup = pick(pool, 3)
+    d = pd.concat([d, d.loc[dup]], ignore_index=True)
+    log["doctors"] = {"doublons": 3, "textes_corriges": 4}
+
+    # ---------------- avis ----------------
+    r = reviews.copy().reset_index(drop=True)
+    r["rating"] = r["rating"].astype("Int64")      # entier qui accepte "vide"
+    pool = list(range(len(r)))
+
+    bad = pick(pool, 10)
+    r.loc[bad, "rating"] = rng_noise.choice([0, 6, 7, 9], size=10)
+    for i in pick(pool, 10):
+        r.loc[i, "rating"] = pd.NA
+    for k, i in enumerate(pick(pool, 8)):
+        r.loc[i, "comment"] = np.nan if k % 2 == 0 else "   "
+    for i in pick(pool, 6):
+        r.loc[i, "doctor_id"] = 999                # médecin qui n'existe pas
+    for i in pick(pool, 15):
+        r.loc[i, "comment"] = messy(r.loc[i, "comment"])
+    wrong = ["positif", "???", "POSITIVE", "bad"]
+    for i in pick(pool, 8):
+        r.loc[i, "sentiment"] = rng_noise.choice(wrong)
+    dup = pick(pool, 20)
+    r = pd.concat([r, r.loc[dup]], ignore_index=True)
+    log["reviews"] = {
+        "doublons": 20, "note_invalide": 10, "note_manquante": 10,
+        "commentaire_vide": 8, "medecin_inconnu": 6,
+        "textes_corriges": 15, "sentiments_corriges": 8,
+    }
+
+    # ---------------- historique d'attente ----------------
+    w = waiting.copy().reset_index(drop=True)
+    pool = list(range(len(w)))
+    for i in pick(pool, 12):
+        w.loc[i, "actual_wait_min"] = -float(rng_noise.integers(5, 31))
+    for i in pick(pool, 8):
+        w.loc[i, "patients_before"] = -int(rng_noise.integers(1, 4))
+    for i in pick(pool, 10):
+        w.loc[i, "hour_of_day"] = int(rng_noise.integers(24, 31))
+    for i in pick(pool, 5):
+        w.loc[i, "day_of_week"] = int(rng_noise.integers(7, 10))
+    for i in pick(pool, 15):
+        w.loc[i, "actual_wait_min"] = np.nan
+    dup = pick(pool, 25)
+    w = pd.concat([w, w.loc[dup]], ignore_index=True)
+    log["waiting_history"] = {
+        "doublons": 25, "attente_negative": 12, "patients_negatifs": 8,
+        "heure_invalide": 10, "jour_invalide": 5, "valeur_manquante": 15,
+    }
+
+    return d, r, w, log
+
+
+# ---------------------------------------------------------------------------
+# 7. PROGRAMME PRINCIPAL
 # ---------------------------------------------------------------------------
 
 def main():
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")   # accents lisibles dans Git Bash
+
     doctors = generate_doctors()
     reviews = generate_reviews(doctors)
     waiting = generate_waiting_history(doctors)
@@ -246,15 +345,34 @@ def main():
         "avg_rating", "reviews_count", "avg_consultation_min",
     ]]
 
-    # Écriture des fichiers CSV
-    doctors.to_csv(OUTPUT_DIR / "doctors.csv", index=False, encoding="utf-8")
-    reviews.to_csv(OUTPUT_DIR / "reviews.csv", index=False, encoding="utf-8")
-    waiting.to_csv(OUTPUT_DIR / "waiting_history.csv", index=False, encoding="utf-8")
+    # Version PARFAITE (vérité terrain) : AI/data/reference/
+    ref_dir = OUTPUT_DIR / "reference"
+    ref_dir.mkdir(exist_ok=True)
+    doctors.to_csv(ref_dir / "doctors.csv", index=False, encoding="utf-8")
+    reviews.to_csv(ref_dir / "reviews.csv", index=False, encoding="utf-8")
+    waiting.to_csv(ref_dir / "waiting_history.csv", index=False, encoding="utf-8")
 
-    print(f"doctors.csv         : {len(doctors)} lignes")
-    print(f"reviews.csv         : {len(reviews)} lignes")
-    print(f"waiting_history.csv : {len(waiting)} lignes")
-    print(f"Fichiers écrits dans : {OUTPUT_DIR}")
+    print("Version parfaite (référence) :")
+    print(f"  doctors.csv         : {len(doctors)} lignes")
+    print(f"  reviews.csv         : {len(reviews)} lignes")
+    print(f"  waiting_history.csv : {len(waiting)} lignes")
+
+    # Version BRUTE avec anomalies volontaires (pour tester le nettoyage)
+    raw_doctors, raw_reviews, raw_waiting, log = inject_anomalies(doctors, reviews, waiting)
+    raw_dir = OUTPUT_DIR / "raw"
+    raw_dir.mkdir(exist_ok=True)
+    raw_doctors.to_csv(raw_dir / "doctors_raw.csv", index=False, encoding="utf-8")
+    raw_reviews.to_csv(raw_dir / "reviews_raw.csv", index=False, encoding="utf-8")
+    raw_waiting.to_csv(raw_dir / "waiting_history_raw.csv", index=False, encoding="utf-8")
+    with open(raw_dir / "anomalies_injected.json", "w", encoding="utf-8") as f:
+        json.dump(log, f, ensure_ascii=False, indent=2)
+
+    print()
+    print("Version brute (avec anomalies volontaires) :")
+    print(f"  doctors_raw.csv         : {len(raw_doctors)} lignes")
+    print(f"  reviews_raw.csv         : {len(raw_reviews)} lignes")
+    print(f"  waiting_history_raw.csv : {len(raw_waiting)} lignes")
+    print(f"  Détail des anomalies    : {raw_dir / 'anomalies_injected.json'}")
 
 
 if __name__ == "__main__":
