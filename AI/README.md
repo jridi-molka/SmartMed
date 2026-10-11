@@ -19,6 +19,7 @@ AI/
 ├── preprocessing/
 │   ├── clean_data.py      # nettoyage + création de variables + rapport
 │   └── verify_cleaning.py # vérifie le nettoyage en le comparant à reference/
+├── variables_study.ipynb  # étude des variables : graphiques, corrélations, conclusions par module
 ├── recommendation/        # module de recommandation de médecins (Sprint 6)
 ├── waiting_time/          # module de prédiction du temps d'attente (Sprint 6)
 ├── sentiment/             # module d'analyse des avis (Sprint 6)
@@ -26,13 +27,13 @@ AI/
 └── README.md              # ce document
 ```
 
-| Dossier | Rôle |
-|---|---|
-| `data` | Génère et stocke les jeux de données (brut, propre, référence). |
-| `preprocessing` | Transforme les données brutes en données propres et utilisables par les modèles. |
-| `recommendation` | Calcule un score pour proposer les meilleurs médecins à un patient. |
-| `waiting_time` | Estime combien de minutes un patient va attendre. |
-| `sentiment` | Détermine si un avis est positif, neutre ou négatif et repère les thèmes récurrents. |
+| Dossier          | Rôle                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------ |
+| `data`           | Génère et stocke les jeux de données (brut, propre, référence).                      |
+| `preprocessing`  | Transforme les données brutes en données propres et utilisables par les modèles.     |
+| `recommendation` | Calcule un score pour proposer les meilleurs médecins à un patient.                  |
+| `waiting_time`   | Estime combien de minutes un patient va attendre.                                    |
+| `sentiment`      | Détermine si un avis est positif, neutre ou négatif et repère les thèmes récurrents. |
 
 ---
 
@@ -64,19 +65,19 @@ python preprocessing/verify_cleaning.py   # 3. vérifie le résultat
 
 Le détail exact est dans `data/raw/anomalies_injected.json`. Résumé :
 
-| Fichier | Anomalies injectées |
-|---|---|
-| `doctors_raw.csv` | 3 doublons, 4 textes avec espaces superflus |
-| `reviews_raw.csv` | 20 doublons, 10 notes hors de 1 à 5, 10 notes manquantes, 8 commentaires vides, 6 avis sur un médecin inexistant, 15 commentaires avec espaces superflus, 8 sentiments invalides |
-| `waiting_history_raw.csv` | 25 doublons, 12 attentes négatives, 8 nombres de patients négatifs, 10 heures impossibles, 5 jours impossibles, 15 valeurs manquantes |
+| Fichier                   | Anomalies injectées                                                                                                                                                              |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `doctors_raw.csv`         | 3 doublons, 4 textes avec espaces superflus                                                                                                                                      |
+| `reviews_raw.csv`         | 20 doublons, 10 notes hors de 1 à 5, 10 notes manquantes, 8 commentaires vides, 6 avis sur un médecin inexistant, 15 commentaires avec espaces superflus, 8 sentiments invalides |
+| `waiting_history_raw.csv` | 25 doublons, 12 attentes négatives, 8 nombres de patients négatifs, 10 heures impossibles, 5 jours impossibles, 15 valeurs manquantes                                            |
 
 ### Résultat du nettoyage
 
-| Fichier | Lignes brutes | Lignes propres |
-|---|---|---|
-| doctors | 53 | 50 |
-| reviews | 1 222 | 1 168 |
-| waiting_history | 4 025 | 3 950 |
+| Fichier         | Lignes brutes | Lignes propres |
+| --------------- | ------------- | -------------- |
+| doctors         | 53            | 50             |
+| reviews         | 1 222         | 1 168          |
+| waiting_history | 4 025         | 3 950          |
 
 `clean_data.py` affiche, pour chaque type d'anomalie, le nombre détecté à côté du nombre injecté. `verify_cleaning.py` confirme ensuite que les valeurs conservées sont identiques à la référence.
 
@@ -98,14 +99,14 @@ Le détail exact est dans `data/raw/anomalies_injected.json`. Résumé :
 
 **Question** : quel médecin proposer à ce patient ?
 
-| Feature | Description | Type | Origine |
-|---|---|---|---|
-| `specialty` | Spécialité du médecin | catégorie | `doctors` |
-| `distance_km` | Distance entre le patient et le médecin | nombre | calculée à partir des positions GPS (Sprint suivant) |
-| `avg_rating` | Note moyenne (1 à 5) | nombre | recalculée sur les avis propres |
-| `reviews_count` | Nombre d'avis reçus | entier | recalculée sur les avis propres |
-| `next_available_hours` | Délai avant le prochain créneau libre | nombre | fournie par le backend (rendez-vous) |
-| `avg_wait_minutes` | Temps d'attente moyen réel du médecin | nombre | **créée** par `clean_data.py` |
+| Feature                | Description                             | Type      | Origine                                              |
+| ---------------------- | --------------------------------------- | --------- | ---------------------------------------------------- |
+| `specialty`            | Spécialité du médecin                   | catégorie | `doctors`                                            |
+| `distance_km`          | Distance entre le patient et le médecin | nombre    | calculée à partir des positions GPS (Sprint suivant) |
+| `avg_rating`           | Note moyenne (1 à 5)                    | nombre    | recalculée sur les avis propres                      |
+| `reviews_count`        | Nombre d'avis reçus                     | entier    | recalculée sur les avis propres                      |
+| `next_available_hours` | Délai avant le prochain créneau libre   | nombre    | fournie par le backend (rendez-vous)                 |
+| `avg_wait_minutes`     | Temps d'attente moyen réel du médecin   | nombre    | **créée** par `clean_data.py`                        |
 
 **Sortie** : un score entre 0 et 1 pour chaque médecin. Le plus haut score est proposé en premier.
 
@@ -113,12 +114,12 @@ Le détail exact est dans `data/raw/anomalies_injected.json`. Résumé :
 
 **Question** : combien de temps vais-je attendre ?
 
-| Feature | Description | Type | Origine |
-|---|---|---|---|
-| `patients_before` | Nombre de patients avant moi dans la file | entier | `waiting_history` |
-| `avg_consultation_min` | Durée moyenne d'une consultation du médecin | nombre | `waiting_history` |
-| `hour_of_day` | Heure de la journée (0 à 23) | entier | `waiting_history` |
-| `day_of_week` | Jour de la semaine (0 = lundi) | entier | `waiting_history` |
+| Feature                | Description                                                                              | Type   | Origine                       |
+| ---------------------- | ---------------------------------------------------------------------------------------- | ------ | ----------------------------- |
+| `patients_before`      | Nombre de patients avant moi dans la file                                                | entier | `waiting_history`             |
+| `avg_consultation_min` | Durée moyenne d'une consultation du médecin                                              | nombre | `waiting_history`             |
+| `hour_of_day`          | Heure de la journée (0 à 23)                                                             | entier | `waiting_history`             |
+| `day_of_week`          | Jour de la semaine (0 = lundi)                                                           | entier | `waiting_history`             |
 | `doctor_avg_delay_min` | Retard moyen du médecin : attente réelle moins (patients devant × durée de consultation) | nombre | **créée** par `clean_data.py` |
 
 **Cible** : `actual_wait_min`, le temps d'attente réel en minutes.
@@ -127,10 +128,10 @@ Le détail exact est dans `data/raw/anomalies_injected.json`. Résumé :
 
 **Question** : cet avis est-il positif, neutre ou négatif ?
 
-| Donnée | Description | Type |
-|---|---|---|
-| `comment` | Texte de l'avis (en français) | texte |
-| `rating` | Note donnée (1 à 5) | entier |
+| Donnée    | Description                   | Type   |
+| --------- | ----------------------------- | ------ |
+| `comment` | Texte de l'avis (en français) | texte  |
+| `rating`  | Note donnée (1 à 5)           | entier |
 
 **Cible** : `sentiment` (`positive`, `neutral`, `negative`).
 Thèmes à repérer : attente, accueil, prix, qualité des soins, propreté.
@@ -142,39 +143,42 @@ Thèmes à repérer : attente, accueil, prix, qualité des soins, propreté.
 Les noms de colonnes sont en `snake_case` et doivent rester **identiques** à ceux de la base PostgreSQL (ex. : `doctor_id`, pas `doctorId`).
 
 ### `doctors_clean.csv`
-| Colonne | Type | Exemple |
-|---|---|---|
-| `doctor_id` | entier | 12 |
-| `name` | texte | Dr. Hichem Sassi |
-| `specialty` | texte | ORL |
-| `latitude` | nombre | 36.80650 |
-| `longitude` | nombre | 10.18150 |
-| `avg_consultation_min` | entier | 20 |
-| `avg_rating` | nombre (1 à 5) | 4.3 |
-| `reviews_count` | entier | 24 |
-| `doctor_avg_delay_min` | nombre | 12.8 |
-| `avg_wait_minutes` | nombre | 103.8 |
+
+| Colonne                | Type           | Exemple          |
+| ---------------------- | -------------- | ---------------- |
+| `doctor_id`            | entier         | 12               |
+| `name`                 | texte          | Dr. Hichem Sassi |
+| `specialty`            | texte          | ORL              |
+| `latitude`             | nombre         | 36.80650         |
+| `longitude`            | nombre         | 10.18150         |
+| `avg_consultation_min` | entier         | 20               |
+| `avg_rating`           | nombre (1 à 5) | 4.3              |
+| `reviews_count`        | entier         | 24               |
+| `doctor_avg_delay_min` | nombre         | 12.8             |
+| `avg_wait_minutes`     | nombre         | 103.8            |
 
 ### `reviews_clean.csv`
-| Colonne | Type | Exemple |
-|---|---|---|
-| `review_id` | entier | 301 |
-| `doctor_id` | entier | 12 |
-| `rating` | entier (1 à 5) | 2 |
-| `comment` | texte | Beaucoup trop d'attente, plus d'une heure. |
-| `sentiment` | texte | negative |
+
+| Colonne     | Type           | Exemple                                    |
+| ----------- | -------------- | ------------------------------------------ |
+| `review_id` | entier         | 301                                        |
+| `doctor_id` | entier         | 12                                         |
+| `rating`    | entier (1 à 5) | 2                                          |
+| `comment`   | texte          | Beaucoup trop d'attente, plus d'une heure. |
+| `sentiment` | texte          | negative                                   |
 
 ### `waiting_history_clean.csv`
-| Colonne | Type | Exemple |
-|---|---|---|
-| `record_id` | entier | 1050 |
-| `doctor_id` | entier | 12 |
-| `patients_before` | entier | 4 |
-| `avg_consultation_min` | entier | 20 |
-| `hour_of_day` | entier | 10 |
-| `day_of_week` | entier | 2 |
-| `actual_wait_min` | nombre | 87.0 |
-| `doctor_avg_delay_min` | nombre | 12.8 |
+
+| Colonne                | Type   | Exemple |
+| ---------------------- | ------ | ------- |
+| `record_id`            | entier | 1050    |
+| `doctor_id`            | entier | 12      |
+| `patients_before`      | entier | 4       |
+| `avg_consultation_min` | entier | 20      |
+| `hour_of_day`          | entier | 10      |
+| `day_of_week`          | entier | 2       |
+| `actual_wait_min`      | nombre | 87.0    |
+| `doctor_avg_delay_min` | nombre | 12.8    |
 
 ---
 
@@ -195,6 +199,8 @@ Les noms de colonnes sont en `snake_case` et doivent rester **identiques** à ce
 - **Les anomalies sont injectées volontairement** pour valider le pipeline. Ce ne sont pas de vraies erreurs d'utilisateurs.
 - **Les données médicales réelles sont confidentielles** : aucune donnée de patient réel n'est utilisée.
 - **Stratégie prévue** : entraîner d'abord sur les données simulées pour valider la chaîne technique, puis évaluer sur de vraies données (avis annotés, jeu public, données collectées par l'application).
+- **Les temps d'attente simulés sont longs** (moyenne d'environ 156 min, et 57 % dépassent 2 h) : la simulation représente une file sans rendez-vous, avec jusqu'à 12 patients devant soi.
+- **Le lien parfait entre la note et le sentiment est un artefact du générateur** (le sentiment est déduit de la note) : le modèle de sentiment devra être évalué sur de vrais avis.
 
 ---
 
@@ -202,12 +208,12 @@ Les noms de colonnes sont en `snake_case` et doivent rester **identiques** à ce
 
 Aucun jeu public ne correspond exactement à notre schéma. Pistes examinées :
 
-| Jeu de données | Intérêt | Limite |
-|---|---|---|
-| TUNIZI (commentaires en dialecte tunisien, lettres latines, positif/négatif, environ 9 200 commentaires) | Test d'un modèle de sentiment sur du dialecte tunisien | Commentaires YouTube, pas médicaux ; pas de classe neutre ; licence non précisée |
-| Medical Appointment No Shows (Kaggle) | Vrais rendez-vous médicaux, délais de prise de rendez-vous | Ne contient pas le temps d'attente en salle d'attente (à vérifier avant de citer) |
-| `doctor_review` (Hugging Face) | Avis sur des médecins | Moins de 1 000 lignes, description incomplète |
-| Temps d'attente des urgences (données ouvertes, ex. Irlande du Nord) | Ordres de grandeur réels | Statistiques agrégées, pas des patients individuels |
+| Jeu de données                                                                                           | Intérêt                                                    | Limite                                                                            |
+| -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| TUNIZI (commentaires en dialecte tunisien, lettres latines, positif/négatif, environ 9 200 commentaires) | Test d'un modèle de sentiment sur du dialecte tunisien     | Commentaires YouTube, pas médicaux ; pas de classe neutre ; licence non précisée  |
+| Medical Appointment No Shows (Kaggle)                                                                    | Vrais rendez-vous médicaux, délais de prise de rendez-vous | Ne contient pas le temps d'attente en salle d'attente (à vérifier avant de citer) |
+| `doctor_review` (Hugging Face)                                                                           | Avis sur des médecins                                      | Moins de 1 000 lignes, description incomplète                                     |
+| Temps d'attente des urgences (données ouvertes, ex. Irlande du Nord)                                     | Ordres de grandeur réels                                   | Statistiques agrégées, pas des patients individuels                               |
 
 ---
 
@@ -218,7 +224,7 @@ Aucun jeu public ne correspond exactement à notre schéma. Pistes examinées :
 - [x] Script de nettoyage et rapport (`preprocessing/clean_data.py`)
 - [x] Vérification du nettoyage (`preprocessing/verify_cleaning.py`)
 - [x] Architecture du module IA (ce document)
-- [ ] Première étude des variables (notebook : graphiques et corrélations)
+- [x] Première étude des variables (`variables_study.ipynb`)
 - [ ] Noms de colonnes validés avec l'équipe Backend
 
 ---
